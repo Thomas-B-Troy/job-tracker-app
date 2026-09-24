@@ -349,6 +349,8 @@
   function setChrome(title, tab, back) {
     $("#title").textContent = title;
     document.title = title === "Job Tracker" ? title : `${title} · Job Tracker`;
+    // The app name gets the wordmark treatment; contextual titles stay compact.
+    document.querySelector(".top").classList.toggle("brand", title === "Job Tracker");
     $("#back").hidden = !back;
     document.querySelectorAll(".tabs a").forEach((a) => a.classList.toggle("on", a.dataset.tab === tab));
     document.body.classList.toggle("wide", (["roles", "companies", "contacts", "week"].includes(tab) && !back) || tab === "");
