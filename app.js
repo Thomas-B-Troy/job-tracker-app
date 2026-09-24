@@ -296,18 +296,25 @@
   }
 
   function companyCard(c) {
-    const n = state.roles.filter((r) => r.slug === c.slug).length;
-    return `<a class="card" href="#/company/${enc(c.slug)}">
-      <div class="t">${esc(c.data.name || c.slug)}</div>
-      <div class="s">${esc([c.data.industry, c.data.hq].filter(Boolean).join(" · ") || (c.data.researched ? "" : "Not researched yet"))}</div>
-      <div class="row"><span class="muted small">${n} role${n === 1 ? "" : "s"}</span>
-        ${c.data.researched ? `<span class="muted small">researched ${esc(c.data.researched)}</span>` : ""}</div>
+    const d = c.data;
+    const roles = state.roles.filter((r) => r.slug === c.slug);
+    const open = roles.filter((r) => !r.closed);
+    const intros = Array.isArray(d.intros) ? d.intros : [];
+    const about = firstLine(c.body, "overview");
+    return `<a class="tile" href="#/company/${enc(c.slug)}">
+      <div class="tile-co"><span class="avatar h${hue(d.name)}">${esc(initials(d.name))}</span>
+        <div><div class="tile-title">${esc(d.name || c.slug)}</div><div class="muted small">${esc(d.industry || "")}</div></div></div>
+      <div class="co-meta">${[d.size, d.hq].filter(Boolean).map((x) => `<span class="tag">${esc(String(x).split(";")[0].replace(/\s*\(.*$/, ""))}</span>`).join("")}</div>
+      ${about ? `<div class="tile-row">${ICON_DOC}<div class="clamp3">${esc(about)}</div></div>` : ""}
+      ${intros.length ? `<div class="tile-flag${intros.some(isHot) ? " hot" : ""}">${ICON_LINK}<span>${intros.length} warm intro path${intros.length === 1 ? "" : "s"}</span></div>` : ""}
+      <div class="tile-foot">${open.length ? `<span class="pill applied">${open.length} open</span>` : ""}${roles.length - open.length ? `<span class="pill">${roles.length - open.length} closed</span>` : ""}
+        <span class="muted small">${d.researched ? `Researched ${esc(d.researched)}` : "Not researched yet"}</span></div>
     </a>`;
   }
 
   function contactCard(p) {
     const co = p.company_slug && state.companies[p.company_slug];
-    return `<div class="card">
+    return `<div class="tile">
       <div class="t">${esc(p.name)}</div>
       <div class="s">${esc([p.role, p.company].filter(Boolean).join(", "))}</div>
       ${p.notes ? `<div class="small">${esc(p.notes)}</div>` : ""}
@@ -342,7 +349,7 @@
     document.title = title === "Job Tracker" ? title : `${title} · Job Tracker`;
     $("#back").hidden = !back;
     document.querySelectorAll(".tabs a").forEach((a) => a.classList.toggle("on", a.dataset.tab === tab));
-    document.body.classList.toggle("wide", tab === "roles" && !back || tab === "");
+    document.body.classList.toggle("wide", (["roles", "companies", "contacts", "week"].includes(tab) && !back) || tab === "");
   }
 
   // Count new warm intros on open roles: dot on the Roles tab, and the home-screen icon badge where supported.
@@ -441,10 +448,18 @@
     });
   }
 
+  let companyFilter = "open";
   function viewCompanies() {
     setChrome("Companies", "companies");
-    const list = Object.values(state.companies).sort((a, b) => String(a.data.name).localeCompare(String(b.data.name)));
-    view.innerHTML = `<div class="list">${list.map(companyCard).join("") || '<p class="empty">No companies yet.</p>'}</div>`;
+    const hasOpen = (c) => state.roles.some((r) => r.slug === c.slug && !r.closed);
+    const all = Object.values(state.companies);
+    const filters = { open: ["With open roles", hasOpen], researched: ["Researched", (c) => !!c.data.researched], all: ["All", () => true] };
+    const list = all.filter(filters[companyFilter][1])
+      .sort((a, b) => (hasOpen(b) - hasOpen(a)) || String(a.data.name).localeCompare(String(b.data.name)));
+    view.innerHTML = `<div class="chips">${Object.entries(filters).map(([k, [l, f]]) =>
+        `<button class="chip${k === companyFilter ? " on" : ""}" data-f="${k}">${l} (${all.filter(f).length})</button>`).join("")}</div>
+      <div class="tiles">${list.map(companyCard).join("") || '<p class="empty">No companies here.</p>'}</div>`;
+    view.querySelectorAll("[data-f]").forEach((b) => b.addEventListener("click", () => { companyFilter = b.dataset.f; viewCompanies(); }));
   }
 
   function viewCompany(slug) {
@@ -468,30 +483,132 @@
 
   function viewContacts() {
     setChrome("People", "contacts");
-    const list = [...state.contacts].sort((a, b) => String(a.name).localeCompare(String(b.name)));
-    view.innerHTML = `<div class="list">${list.map(contactCard).join("") || '<p class="empty">No contacts yet.</p>'}</div>`;
+    const order = ["Hiring contact", "Recruiter", "Industry contact", "Friend", "LinkedIn 1st"];
+    const heading = { "Hiring contact": "Hiring contacts", "Recruiter": "Recruiters", "Industry contact": "Industry contacts", "Friend": "Friends and advisors", "LinkedIn 1st": "Connections who can introduce you" };
+    const groups = {};
+    for (const p of state.contacts) (groups[p.connection_type || "Other"] ||= []).push(p);
+    const keys = Object.keys(groups).sort((a, b) => ((order.indexOf(a) + 1) || 99) - ((order.indexOf(b) + 1) || 99));
+    view.innerHTML = keys.map((k) => `<div class="group-h">${esc(heading[k] || k)} (${groups[k].length})</div>
+      <div class="tiles">${groups[k].sort((a, b) => String(a.name).localeCompare(String(b.name))).map(contactCard).join("")}</div>`).join("")
+      || '<p class="empty">No contacts yet.</p>';
   }
 
-  const METRICS = [
-    ["companies_researched", "Companies researched"], ["applications_submitted", "Applications"],
-    ["new_linkedin_connections", "New connections"], ["outreach_messages_sent", "Outreach sent"],
-    ["networking_meetings_booked", "Meetings booked"], ["referrals_requested", "Referrals asked"],
-    ["follow_ups_sent", "Follow-ups"], ["phone_screens", "Phone screens"], ["interviews", "Interviews"],
+  // ---------- progress: weekly activity worked out from the tracker files themselves
+  const PROGRESS = [
+    ["applied", "Applications", "applications_submitted"],
+    ["researched", "Companies researched", "companies_researched"],
+    ["followups", "Follow-ups and outreach", "follow_ups_sent"],
+    ["responses", "Employer responses", ""],
+    ["interviews", "Calls and interviews", "interviews"],
+    ["intros", "Warm intros found", ""],
   ];
+  const RE_INTERVIEW = /interview|phone screen|phone call|called|video (answers|stage|screen)|panel/i;
+  // Real responses only: automatic "application received" emails are not counted.
+  const RE_RESPONSE = /reject|unlikely to progress|not progress|filled|unsuccessful|viewed by employer|replied|arrange/i;
+  const RE_FOLLOWUP = /follow(ed)? ?up|emailed|reached out|sent (her|him|them) |thanked/i;
+
+  function mondayOf(date) {
+    const d = new Date(`${String(date).slice(0, 10)}T00:00:00`);
+    if (isNaN(d)) return "";
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    return d.toLocaleDateString("en-CA");
+  }
+
+  const countsAsApplied = (r) => r.data.date_applied && !/^(not-applied|lead|drafting)/.test(r.status);
+
+  function activityLog(r) {
+    return (sections(r.body).find((x) => /^activity log$/i.test(x.title)) || { text: "" }).text;
+  }
+
+  function progressEvents() {
+    const ev = [];
+    const add = (date, type, what) => { const w = mondayOf(date); if (w) ev.push({ week: w, type, what }); };
+    for (const r of state.roles) {
+      if (countsAsApplied(r)) add(r.data.date_applied, "applied", `${r.data.company}: ${r.data.role}`);
+      for (const line of activityLog(r).split("\n")) {
+        const m = /^-\s*(?:c\.\s*)?(\d{4}-\d{2}-\d{2})[^:]*:\s*(.+)$/.exec(line.trim());
+        if (!m || /^(applied|documents built|researched|linkedin and glassdoor|no reply|no update)/i.test(m[2])) continue;
+        const what = `${r.data.company}: ${m[2]}`;
+        if (RE_INTERVIEW.test(m[2])) add(m[1], "interviews", what);
+        else if (RE_RESPONSE.test(m[2]) && !/^tom /i.test(m[2])) add(m[1], "responses", what);
+        else if (RE_FOLLOWUP.test(m[2])) add(m[1], "followups", what);
+      }
+    }
+    for (const c of Object.values(state.companies)) {
+      if (c.data.researched) add(c.data.researched, "researched", c.data.name || c.slug);
+      for (const i of (Array.isArray(c.data.intros) ? c.data.intros : [])) {
+        if (i && i.added) add(i.added, "intros", `${i.via} knows ${i.to} (${c.data.name || c.slug})`);
+      }
+    }
+    return ev;
+  }
 
   function viewWeek() {
-    setChrome("Week", "week");
-    const w = state.weekly || {};
-    const goals = w.goals || {};
-    const weeks = (Array.isArray(w.weeks) ? w.weeks : []).slice().sort((a, b) => String(b.week_starting).localeCompare(String(a.week_starting))).slice(0, 6);
-    const cell = (v, g) => v === undefined || v === null || v === "" ? "<td></td>"
-      : `<td class="${g !== undefined ? (Number(v) >= Number(g) ? "hit" : "miss") : ""}">${esc(v)}</td>`;
+    setChrome("Progress", "week");
+    const ev = progressEvents();
+    const goals = (state.weekly && state.weekly.goals) || {};
+    const hasGoals = Object.values(goals).some((v) => v !== null && v !== "" && v !== undefined);
+    const thisWeek = mondayOf(today());
+    // Every week from the first logged activity to now (up to 12), including quiet weeks.
+    const first = ev.map((e) => e.week).sort()[0] || thisWeek;
+    const weeks = [];
+    for (let d = new Date(`${thisWeek}T00:00:00`); weeks.length < 12; d.setDate(d.getDate() - 7)) {
+      const w = d.toLocaleDateString("en-CA");
+      weeks.push(w);
+      if (w <= first) break;
+    }
+    const count = (w, t) => ev.filter((e) => e.week === w && e.type === t).length;
+    const total = (t) => ev.filter((e) => e.type === t).length;
+    const applied = state.roles.filter(countsAsApplied);
+    const heard = applied.filter((r) => /^(rejected|interviewing|offer|screening)/.test(r.status)
+      || activityLog(r).split("\n").some((l) => RE_RESPONSE.test(l) && !/handover|tom (said|confirmed|can't)/i.test(l)));
+    const interviewing = state.roles.filter((r) => /^(interviewing|offer|screening)/.test(r.status));
+    const lastWeek = weeks[1];
+    const trend = (t) => {
+      const a = count(thisWeek, t), b = lastWeek ? count(lastWeek, t) : 0;
+      return a === b ? "same as last week" : a > b ? `up from ${b} last week` : `down from ${b} last week`;
+    };
+    const maxApplied = Math.max(1, ...weeks.map((w) => count(w, "applied")));
+    const fmt = (w) => new Date(`${w}T00:00:00`).toLocaleDateString("en-AU", { day: "numeric", month: "short" });
+    const cell = (w, t, key) => {
+      const n = count(w, t), g = Number(goals[key]);
+      const cls = hasGoals && g ? (n >= g ? "hit" : w === thisWeek ? "" : "miss") : "";
+      return `<td class="${cls}">${n || '<span class="muted">0</span>'}</td>`;
+    };
+    const introCompanies = new Set(Object.values(state.companies).filter((c) => Array.isArray(c.data.intros) && c.data.intros.length).map((c) => c.slug)).size;
+    const reflections = (state.weekly && Array.isArray(state.weekly.weeks) ? state.weekly.weeks : [])
+      .filter((x) => x && (x.went_well || x.adjust || x.notes))
+      .sort((a, b) => String(b.week_starting).localeCompare(String(a.week_starting)));
+    const label = (t) => PROGRESS.find(([k]) => k === t)[1];
     view.innerHTML = `
-      <div class="table-wrap"><table class="week"><thead><tr><th>Measure</th><th>Goal</th>${weeks.map((x) => `<th>${esc(x.week_starting)}</th>`).join("")}</tr></thead>
-      <tbody>${METRICS.map(([k, label]) => `<tr><td>${esc(label)}</td><td>${esc(goals[k] ?? "")}</td>${weeks.map((x) => cell(x[k], goals[k])).join("")}</tr>`).join("")}</tbody></table></div>
-      ${weeks.length ? "" : '<p class="empty">No weeks logged yet. Ask Claude to add this week\'s numbers to weekly.yaml.</p>'}
-      ${weeks.map((x) => (x.went_well || x.adjust || x.notes) ? `<details class="sec"><summary>${esc(x.week_starting)} reflection</summary><div class="md">
-        ${x.went_well ? `<p><strong>Went well:</strong> ${esc(x.went_well)}</p>` : ""}${x.adjust ? `<p><strong>Adjust:</strong> ${esc(x.adjust)}</p>` : ""}${x.notes ? `<p>${esc(x.notes)}</p>` : ""}</div></details>` : "").join("")}`;
+      <div class="stats">
+        <div class="stat"><div class="n">${count(thisWeek, "applied")}</div><div class="k">Applications this week</div><div class="s">${trend("applied")}</div></div>
+        <div class="stat"><div class="n">${count(thisWeek, "followups")}</div><div class="k">Follow-ups this week</div><div class="s">${trend("followups")}</div></div>
+        <div class="stat"><div class="n">${applied.length}</div><div class="k">Applications in total</div><div class="s">${total("researched")} companies researched</div></div>
+        <div class="stat"><div class="n">${applied.length ? Math.round((heard.length / applied.length) * 100) : 0}%</div><div class="k">Heard back</div><div class="s">${heard.length} of ${applied.length} applications</div></div>
+        <div class="stat"><div class="n">${interviewing.length}</div><div class="k">In interview stages now</div><div class="s">${total("interviews")} calls or interviews logged</div></div>
+        <div class="stat"><div class="n">${total("intros")}</div><div class="k">Warm intros found</div><div class="s">across ${introCompanies} companies</div></div>
+      </div>
+
+      <div class="group-h">Applications per week</div>
+      <div class="bars">${weeks.slice().reverse().map((w) => `<div class="bar-col" title="${count(w, "applied")} applications, week of ${fmt(w)}">
+        <div class="bar-n">${count(w, "applied") || ""}</div><div class="pbar" data-h="${Math.round((count(w, "applied") / maxApplied) * 100)}"></div><div class="bar-l">${fmt(w)}</div></div>`).join("")}</div>
+
+      <div class="group-h">Week by week</div>
+      <div class="table-wrap"><table class="week"><thead><tr><th>Week of</th>${PROGRESS.map(([, l]) => `<th>${esc(l)}</th>`).join("")}</tr></thead>
+        <tbody>
+        ${hasGoals ? `<tr class="goal-row"><td>Weekly goal</td>${PROGRESS.map(([, , key]) => `<td>${key && goals[key] ? esc(goals[key]) : ""}</td>`).join("")}</tr>` : ""}
+        ${weeks.map((w) => `<tr><td>${fmt(w)}${w === thisWeek ? ' <span class="pill">this week</span>' : ""}</td>${PROGRESS.map(([t, , key]) => cell(w, t, key)).join("")}</tr>`).join("")}
+        </tbody></table></div>
+      <p class="small muted">Worked out from your tracker: application dates, activity log entries, research dates and warm intros. Anything not logged isn't counted.${hasGoals ? "" : " Set weekly goals in weekly.yaml to see them here."}</p>
+
+      <details class="sec"><summary>This week's activity</summary><div class="md">${
+        ev.filter((e) => e.week === thisWeek).map((e) => `<p><span class="pill">${esc(label(e.type))}</span> ${esc(e.what)}</p>`).join("") || '<p class="empty">Nothing logged yet this week.</p>'}</div></details>
+
+      ${reflections.length ? `<div class="group-h">Reflections</div>${reflections.map((x) => `<details class="sec"><summary>Week of ${esc(x.week_starting)}</summary><div class="md">
+        ${x.went_well ? `<p><strong>Went well:</strong> ${esc(x.went_well)}</p>` : ""}${x.adjust ? `<p><strong>Adjust:</strong> ${esc(x.adjust)}</p>` : ""}${x.notes ? `<p>${esc(x.notes)}</p>` : ""}</div></details>`).join("")}` : ""}`;
+    // The CSP blocks inline style attributes, so bar heights are set from script.
+    view.querySelectorAll(".pbar").forEach((b) => { b.style.height = `${b.dataset.h}%`; });
   }
 
   function viewSettings() {

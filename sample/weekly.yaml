@@ -1,23 +1,9 @@
 goals:
+  applications_submitted: 10
   companies_researched: 5
-  applications_submitted: 12
-  new_linkedin_connections: 10
-  outreach_messages_sent: 10
-  networking_meetings_booked: 5
-  referrals_requested: 5
   follow_ups_sent: 5
-  phone_screens: 1
   interviews: 1
 weeks:
   - week_starting: "2026-09-14"
-    companies_researched: 4
-    applications_submitted: 15
-    new_linkedin_connections: 11
-    outreach_messages_sent: 7
-    networking_meetings_booked: 2
-    referrals_requested: 1
-    follow_ups_sent: 3
-    phone_screens: 1
-    interviews: 0
-    went_well: Applications submitted
-    adjust: More outreach
+    went_well: Two applications through people I know
+    adjust: More follow-ups after applying

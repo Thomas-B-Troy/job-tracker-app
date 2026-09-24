@@ -22,7 +22,7 @@ Based on a job search spreadsheet with three tabs:
   development, onboarding, benefits, org chart, reviews and staff movement, people you
   know there, green and red flags, and the sources for each.
 - **People** (`contacts.yaml`): recruiters, hiring contacts and referrals.
-- **Week** (`weekly.yaml`): weekly goals against what you did.
+- **Progress**: weekly activity worked out from your files (applications, research, follow-ups, responses, interviews, warm intros), with optional goals and reflections in `weekly.yaml`.
 
 From your phone you can search everything, change a role's status and add a note to its
 activity log. Each change is saved as a commit to your repo.
