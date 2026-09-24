@@ -4,6 +4,7 @@
 (() => {
   "use strict";
 
+  const APP_VERSION = "2026-09-24.7";
   const CONFIG_KEY = "jt.config";
   const CACHE_KEY = "jt.cache";
   const API = "https://api.github.com";
@@ -80,6 +81,7 @@
   // ---------- loading
   async function gh(path, opts = {}) {
     const res = await fetch(API + path, {
+      cache: "no-cache",
       ...opts,
       headers: {
         Accept: "application/vnd.github+json",
@@ -650,6 +652,7 @@
         <button class="secondary" id="demo">Try it with sample data</button>
         <button class="secondary" id="forget">Remove token and cached data from this device</button>
       </div>
+      <p class="small muted">App version ${APP_VERSION}</p>
       <p class="small muted">Current mode: ${esc(config.mode || "not set")}${config.mode === "github" ? ` (${esc(config.owner)}/${esc(config.repo)})` : ""}</p>`;
     $("#cfg").addEventListener("submit", (e) => {
       e.preventDefault();
@@ -707,11 +710,22 @@
   window.addEventListener("hashchange", () => { window.scrollTo(0, 0); route(); });
   $("#search").addEventListener("input", route);
   $("#back").addEventListener("click", () => { if (history.length > 1) history.back(); else location.hash = "#/roles"; });
-  $("#refresh").addEventListener("click", () => load());
+  // Refresh reloads the data and also checks for a newer version of the app itself.
+  $("#refresh").addEventListener("click", () => {
+    if (navigator.serviceWorker) navigator.serviceWorker.getRegistration().then((r) => r && r.update()).catch(() => {});
+    load();
+  });
   document.querySelectorAll(".tabs a").forEach((a) => a.addEventListener("click", () => { $("#search").value = ""; }));
 
   if ("serviceWorker" in navigator && location.protocol === "https:") {
-    navigator.serviceWorker.register("sw.js").catch(() => { /* offline support is optional */ });
+    navigator.serviceWorker.register("sw.js").then((r) => r.update()).catch(() => { /* offline support is optional */ });
+    // When a new version takes over, reload once so the new code is used.
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => { if (!reloaded) { reloaded = true; location.reload(); } });
+    // Check for updates whenever the app comes back to the foreground (home-screen apps stay open for days).
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") navigator.serviceWorker.getRegistration().then((r) => r && r.update()).catch(() => {});
+    });
   }
 
   load({ quiet: true });
