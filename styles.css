@@ -38,7 +38,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  padding-bottom: calc(80px + env(safe-area-inset-bottom));
 }
 a { color: var(--link); }
 h1, h2, h3 { line-height: 1.25; }
@@ -62,16 +62,37 @@ h1, h2, h3 { line-height: 1.25; }
 
 main { max-width: 760px; margin: 0 auto; padding: 12px 16px 24px; outline: none; }
 
+/* Section tabs: bottom bar on phones, a row in the header on wider screens */
 .tabs {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 5;
   display: flex; background: var(--surface); border-top: 1px solid var(--line);
-  padding-bottom: env(safe-area-inset-bottom);
+  box-shadow: 0 -2px 12px rgba(0,0,0,.12);
+  padding: 4px 4px env(safe-area-inset-bottom);
 }
 .tabs a {
-  flex: 1; text-align: center; padding: 12px 4px; font-size: .85rem;
-  color: var(--muted); text-decoration: none;
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 6px 2px 8px; margin: 2px; border-radius: 10px;
+  font-size: .78rem; font-weight: 600; color: var(--muted); text-decoration: none;
 }
-.tabs a.on { color: var(--link); font-weight: 600; }
+.tabs svg { width: 24px; height: 24px; fill: currentColor; }
+.tabs a.on { color: var(--accent); background: var(--pill); }
+@media (prefers-color-scheme: dark) { .tabs a.on { color: #cfe6ff; background: #1d3a57; } }
+
+@media (min-width: 800px) {
+  body { padding-bottom: 24px; }
+  .tabs {
+    position: static; margin-top: 10px; padding: 0; gap: 6px;
+    background: none; border: 0; box-shadow: none;
+  }
+  .tabs a {
+    flex: 0 0 auto; flex-direction: row; gap: 8px; margin: 0;
+    padding: 9px 18px; border-radius: 999px; font-size: .95rem;
+    color: var(--accent-text); background: rgba(255,255,255,.12);
+  }
+  .tabs a:hover { background: rgba(255,255,255,.22); }
+  .tabs svg { width: 20px; height: 20px; }
+  .tabs a.on, .tabs a.on:hover { color: var(--accent); background: #fff; }
+}
 
 .chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 12px; }
 .chip {
@@ -167,7 +188,7 @@ table.week th:first-child, table.week td:first-child { text-align: left; }
 
 #toast {
   position: fixed; left: 50%; transform: translateX(-50%);
-  bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 10;
+  bottom: calc(90px + env(safe-area-inset-bottom)); z-index: 10;
   background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 8px;
   max-width: calc(100% - 32px);
 }
@@ -223,7 +244,17 @@ body.wide main { max-width: 1600px; }
 .card.lead { border-left: 4px solid #d8572a; }
 .callout.intros { background: #e6f0fb; color: #0d3c6b; }
 .callout.intros ul { margin: 6px 0 0; padding-left: 18px; }
-.tabs a.dot::after { content: ""; display: inline-block; width: 7px; height: 7px; margin-left: 4px; border-radius: 50%; background: #d8572a; vertical-align: super; }
+.tabs a { position: relative; }
+.tabs a.dot::after { content: ""; position: absolute; top: 5px; right: calc(50% - 20px); width: 9px; height: 9px; border-radius: 50%; background: #d8572a; border: 2px solid var(--surface); }
+@media (min-width: 800px) { .tabs a.dot::after { top: 4px; right: 6px; border-color: var(--accent); } }
+
+/* ---------- welcome screen for first-time visitors */
+.welcome { max-width: 720px; margin: 8px auto; }
+.welcome h2 { font-size: 1.6rem; margin: 0 0 8px; }
+.welcome .lead { font-size: 1.05rem; color: var(--muted); }
+.welcome ul { padding-left: 20px; }
+.welcome li { margin: 6px 0; }
+.welcome .actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0; }
 @media (prefers-color-scheme: dark) {
   .tile-flag, .callout.intros { background: #1d3a57; color: #cfe6ff; }
   .tile-flag.hot, .pill.hot { background: #4a2416; color: #ffd5c4; }
@@ -248,3 +279,4 @@ tr.goal-row td { color: var(--muted); font-style: italic; }
 .tile .t { font-weight: 700; font-size: 1.02rem; }
 .tile .s { color: var(--muted); font-size: .9rem; }
 .tile .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: auto; }
+a.secondary.btn { display: inline-block; text-decoration: none; font: inherit; background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 10px 16px; }

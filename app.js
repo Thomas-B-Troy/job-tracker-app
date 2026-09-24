@@ -178,7 +178,7 @@
         ingest(await loadFromGitHub());
         if (!quiet) toast("Up to date");
       } else if (config.mode === "demo") ingest(await loadStatic("sample/"));
-      else { location.hash = "#/settings"; }
+      else if (!/^#\/(settings|welcome)/.test(location.hash)) { location.hash = "#/welcome"; }
     } catch (e) {
       console.error(e);
       toast(e.message || "Could not load data");
@@ -611,6 +611,28 @@
     view.querySelectorAll(".pbar").forEach((b) => { b.style.height = `${b.dataset.h}%`; });
   }
 
+  function viewWelcome() {
+    setChrome("Job Tracker", "");
+    document.body.classList.remove("wide");
+    view.innerHTML = `<div class="welcome">
+      <h2>Your job search, in one place</h2>
+      <p class="lead">When a recruiter or hiring manager calls, search the company and get everything on one screen: the role, when and how you applied, which resume you sent, who you know there, and your research on the company.</p>
+      <ul>
+        <li><strong>Roles</strong>: every application as a tile, with status, next actions and warm introduction paths.</li>
+        <li><strong>Companies</strong>: research on each company, from the job ad, the company website, Glassdoor and LinkedIn, with sources.</li>
+        <li><strong>People</strong>: recruiters, hiring contacts and the connections who can introduce you.</li>
+        <li><strong>Progress</strong>: applications, follow-ups, responses and interviews, week by week.</li>
+      </ul>
+      <p>Everything lives in plain text files in your own private GitHub repo. There is no account to create and no server: the app reads your repo with a key that stays on your device.</p>
+      <div class="actions">
+        <button class="primary" id="try">Look around with sample data</button>
+        <a class="secondary btn" href="#/settings">Connect my own tracker</a>
+      </div>
+      <p class="small muted">The sample companies and people are made up.</p>
+    </div>`;
+    $("#try").addEventListener("click", () => { config = { mode: "demo" }; saveJSON(CONFIG_KEY, config); saveJSON(CACHE_KEY, {}); location.hash = "#/roles"; load(); });
+  }
+
   function viewSettings() {
     setChrome("Settings", "settings");
     view.innerHTML = `
@@ -670,7 +692,7 @@
     const arg = decodeURIComponent(rest.join("/"));
     if (q && !["settings"].includes(name)) return viewSearch(q);
     ({ roles: viewRoles, role: () => viewRole(arg), companies: viewCompanies, company: () => viewCompany(arg),
-      contacts: viewContacts, week: viewWeek, settings: viewSettings }[name] || viewRoles)();
+      contacts: viewContacts, week: viewWeek, settings: viewSettings, welcome: viewWelcome }[name] || viewRoles)();
     view.focus({ preventScroll: true });
   }
 

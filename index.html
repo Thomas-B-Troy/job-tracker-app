@@ -21,17 +21,17 @@
       <button class="icon-btn" id="refresh" aria-label="Refresh from GitHub" title="Refresh">&#8635;</button>
     </div>
     <input id="search" type="search" placeholder="Search companies, roles, people" autocomplete="off" aria-label="Search">
+    <!-- Sections: a row of tabs in the header on wider screens, a bottom bar on phones -->
+    <nav class="tabs" aria-label="Sections">
+      <a href="#/roles" data-tab="roles"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3h4a2 2 0 0 1 2 2v1h3a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3V5a2 2 0 0 1 2-2zm0 3h4V5h-4zm-5 4v8h14v-8z"/></svg><span>Roles</span></a>
+      <a href="#/companies" data-tab="companies"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v4h2a2 2 0 0 1 2 2v10h-6v-4h-4v4zm4-14v2h2V7zm4 0v2h2V7zm-4 4v2h2v-2zm4 0v2h2v-2zm4 2v2h2v-2z"/></svg><span>Companies</span></a>
+      <a href="#/contacts" data-tab="contacts"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm8 0a3 3 0 1 0-3-3 3 3 0 0 0 3 3zM9 13c-3.3 0-7 1.6-7 4.5V20h14v-2.5C16 14.6 12.3 13 9 13zm8 0c-.5 0-1 0-1.5.1A5 5 0 0 1 18 17.5V20h4v-2.5c0-2.6-2.7-4.5-5-4.5z"/></svg><span>People</span></a>
+      <a href="#/week" data-tab="week"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10h3v10zm6 0V4h3v16zm6 0v-7h3v7z"/></svg><span>Progress</span></a>
+      <a href="#/settings" data-tab="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7 7 0 0 0-1.7-1L15 3h-4l-.4 2.9a7 7 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7 7 0 0 0 1.7 1L11 21h4l.4-2.9a7 7 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 3.5-3.5 3.5 3.5 0 0 1-3.5 3.5z"/></svg><span>Settings</span></a>
+    </nav>
   </header>
 
   <main id="view" tabindex="-1"></main>
-
-  <nav class="tabs" aria-label="Sections">
-    <a href="#/roles" data-tab="roles">Roles</a>
-    <a href="#/companies" data-tab="companies">Companies</a>
-    <a href="#/contacts" data-tab="contacts">People</a>
-    <a href="#/week" data-tab="week">Progress</a>
-    <a href="#/settings" data-tab="settings">Settings</a>
-  </nav>
 
   <div id="toast" role="status" aria-live="polite" hidden></div>
 
