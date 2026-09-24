@@ -75,6 +75,19 @@ next_action_date: "2026-09-26"
 - 2026-09-15: Applied.
 ```
 
+Company files can list warm introduction paths in their header. The app flags them on each
+role tile, lists hot leads at the top of the Roles tab, and marks any added since your last visit
+as new (with a badge on the home-screen icon where the phone supports it):
+
+```yaml
+intros:
+  - via: "Sam Cole"          # someone you know
+    to: "Priya Nair"         # who they know at the company
+    role: "Service Desk Team Lead"
+    hot: true                # a direct line to the hiring side
+    added: "2026-09-14"
+```
+
 See `sample/` for complete examples of every file type.
 
 ## Working with an AI assistant

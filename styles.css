@@ -210,3 +210,21 @@ body.wide main { max-width: 1600px; }
 }
 .clamp2, .clamp3, .clamp4 { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
 .clamp2 { -webkit-line-clamp: 2; } .clamp3 { -webkit-line-clamp: 3; } .clamp4 { -webkit-line-clamp: 4; }
+
+/* ---------- warm intro flags */
+.tile-flag {
+  display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  font-size: .85rem; border-radius: 8px; padding: 6px 8px;
+  background: #e6f0fb; color: #0d3c6b;
+}
+.tile-flag.hot { background: #fde7df; color: #7a2410; }
+.pill.hot { background: #fde7df; color: #7a2410; }
+.pill.new { background: #1f7a4d; color: #fff; }
+.card.lead { border-left: 4px solid #d8572a; }
+.callout.intros { background: #e6f0fb; color: #0d3c6b; }
+.callout.intros ul { margin: 6px 0 0; padding-left: 18px; }
+.tabs a.dot::after { content: ""; display: inline-block; width: 7px; height: 7px; margin-left: 4px; border-radius: 50%; background: #d8572a; vertical-align: super; }
+@media (prefers-color-scheme: dark) {
+  .tile-flag, .callout.intros { background: #1d3a57; color: #cfe6ff; }
+  .tile-flag.hot, .pill.hot { background: #4a2416; color: #ffd5c4; }
+}

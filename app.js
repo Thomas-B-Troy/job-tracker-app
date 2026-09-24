@@ -20,6 +20,10 @@
   let state = { roles: [], companies: {}, contacts: [], weekly: null, sha: {} };
   let config = loadJSON(CONFIG_KEY) || {};
   let roleFilter = "open";
+  // Warm intros added since the previous visit are flagged "new". The first visit counts everything as new.
+  const SEEN_KEY = "jt.seen";
+  const prevSeen = loadJSON(SEEN_KEY) || "";
+  saveJSON(SEEN_KEY, new Date().toLocaleDateString("en-CA", { timeZone: "Australia/Brisbane" }));
 
   // ---------- storage helpers (browser storage can be blocked; never let that break the app)
   function loadJSON(key) { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } }
@@ -160,6 +164,7 @@
     }
     roles.sort((a, b) => b.sortDate.localeCompare(a.sortDate));
     state = { roles, companies, contacts: Array.isArray(contacts) ? contacts : [], weekly, sha };
+    notifyNewIntros();
   }
 
   async function load({ quiet = false } = {}) {
@@ -245,7 +250,27 @@
   const hue = (name) => [...String(name || "")].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7) % 6;
   const ICON_PIN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>';
   const ICON_DOC = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h9l5 5v15H6zm8 1.5V8h4.5z"/></svg>';
+  const ICON_LINK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.6 13.4a1 1 0 0 1 0-1.4l3.4-3.4a1 1 0 1 1 1.4 1.4L12 13.4a1 1 0 0 1-1.4 0zM7 17a3 3 0 0 1 0-4.2l2-2 1.4 1.4-2 2a1 1 0 0 0 1.4 1.4l2-2 1.4 1.4-2 2A3 3 0 0 1 7 17zm6.6-4.6-1.4-1.4 2-2a1 1 0 0 0-1.4-1.4l-2 2-1.4-1.4 2-2a3 3 0 0 1 4.2 4.2z"/></svg>';
   const ICON_USER = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4 0-8 2-8 5v3h16v-3c0-3-4-5-8-5z"/></svg>';
+
+  // Warm intro paths recorded on the company file (intros: [{via, to, role, hot, added}]).
+  const introsFor = (slug) => {
+    const c = state.companies[slug];
+    return c && Array.isArray(c.data.intros) ? c.data.intros.filter((i) => i && i.via && i.to) : [];
+  };
+  const isNew = (i) => String(i.added || "") > prevSeen;
+  const isHot = (i) => i.hot === true || String(i.hot).toLowerCase() === "true";
+
+  function introFlag(r) {
+    if (r.closed) return "";
+    const list = introsFor(r.slug);
+    if (!list.length) return "";
+    const hot = list.find(isHot);
+    const fresh = list.some(isNew) ? '<span class="pill new">new</span>' : "";
+    return hot
+      ? `<div class="tile-flag hot">${ICON_LINK}<span><strong>Hot lead:</strong> ${esc(hot.via)} knows ${esc(hot.to)}${list.length > 1 ? ` (+${list.length - 1} more)` : ""}</span>${fresh}</div>`
+      : `<div class="tile-flag">${ICON_LINK}<span>${list.length} warm intro path${list.length === 1 ? "" : "s"}</span>${fresh}</div>`;
+  }
 
   function roleCard(r) {
     const d = r.data;
@@ -263,6 +288,7 @@
         <div class="clamp3"><strong>${esc(d.company)}</strong>${about ? `: ${esc(about)}` : ""}</div></div>
       ${summary ? `<div class="tile-row">${ICON_DOC}<div class="clamp4">${esc(summary)}</div></div>` : ""}
       ${people ? `<div class="tile-row">${ICON_USER}<div class="clamp2">${esc(people)}</div></div>` : ""}
+      ${introFlag(r)}
       ${d.next_action && !r.closed ? `<div class="tile-next"><strong>Next${d.next_action_date ? ` ${esc(d.next_action_date)}` : ""}:</strong> ${esc(d.next_action)}</div>` : ""}
       <div class="tile-foot">${pill(r.status)}${r.confirm ? '<span class="pill confirm">needs confirming</span>' : ""}
         <span class="muted small">${esc([d.date_applied && `Applied ${d.date_applied}`, d.channel].filter(Boolean).join(" · "))}</span></div>
@@ -319,24 +345,40 @@
     document.body.classList.toggle("wide", tab === "roles" && !back || tab === "");
   }
 
+  // Count new warm intros on open roles: dot on the Roles tab, and the home-screen icon badge where supported.
+  function notifyNewIntros() {
+    const slugs = new Set(state.roles.filter((r) => !r.closed).map((r) => r.slug));
+    const fresh = [...slugs].reduce((n, s) => n + introsFor(s).filter(isNew).length, 0);
+    const tab = document.querySelector('.tabs a[data-tab="roles"]');
+    if (tab) tab.classList.toggle("dot", fresh > 0);
+    try { if (navigator.setAppBadge) fresh ? navigator.setAppBadge(fresh) : navigator.clearAppBadge(); } catch { /* optional */ }
+  }
+
   // ---------- views
   function viewRoles() {
     setChrome("Job Tracker", "roles");
     const groups = {
       open: (r) => !r.closed,
+      intros: (r) => !r.closed && introsFor(r.slug).length > 0,
       confirm: (r) => r.confirm,
       closed: (r) => r.closed,
       all: () => true,
     };
-    const labels = { open: "Open", confirm: "Needs confirming", closed: "Closed", all: "All" };
+    const labels = { open: "Open", intros: "Warm intros", confirm: "Needs confirming", closed: "Closed", all: "All" };
     const list = state.roles.filter(groups[roleFilter] || groups.open);
     const next = state.roles.filter((r) => !r.closed && r.data.next_action_date)
       .sort((a, b) => String(a.data.next_action_date).localeCompare(String(b.data.next_action_date)));
+    const hotLeads = state.roles.filter((r) => !r.closed)
+      .flatMap((r) => introsFor(r.slug).filter(isHot).map((i) => ({ r, i })))
+      .filter((x, n, all) => all.findIndex((y) => y.r.slug === x.r.slug && y.i.to === x.i.to) === n);
     view.innerHTML = `
       <div class="chips">${Object.keys(groups).map((k) =>
         `<button class="chip${k === roleFilter ? " on" : ""}" data-filter="${k}">${labels[k]} (${state.roles.filter(groups[k]).length})</button>`).join("")}</div>
+      ${hotLeads.length && roleFilter === "open" ? `<div class="group-h">Hot leads</div><div class="list">${hotLeads.map(({ r, i }) =>
+        `<a class="card lead" href="#/role/${enc(r.path)}"><div class="t">${esc(i.via)} knows ${esc(i.to)}${isNew(i) ? ' <span class="pill new">new</span>' : ""}</div><div class="s">${esc(i.role || "")}${i.role ? " · " : ""}${esc(r.data.company)}, ${esc(r.data.role)}</div></a>`).join("")}</div>` : ""}
       ${next.length && roleFilter === "open" ? `<div class="group-h">Next actions</div><div class="list">${next.map((r) =>
-        `<a class="card" href="#/role/${enc(r.path)}"><div class="t">${esc(r.data.next_action_date)}: ${esc(r.data.next_action)}</div><div class="s">${esc(r.data.company)}, ${esc(r.data.role)}</div></a>`).join("")}</div><div class="group-h">Roles</div>` : ""}
+        `<a class="card" href="#/role/${enc(r.path)}"><div class="t">${esc(r.data.next_action_date)}: ${esc(r.data.next_action)}</div><div class="s">${esc(r.data.company)}, ${esc(r.data.role)}</div></a>`).join("")}</div>` : ""}
+      ${(next.length || hotLeads.length) && roleFilter === "open" ? '<div class="group-h">Roles</div>' : ""}
       <div class="tiles">${list.map(roleCard).join("") || '<p class="empty">No roles here.</p>'}</div>`;
     view.querySelectorAll("[data-filter]").forEach((b) => b.addEventListener("click", () => { roleFilter = b.dataset.filter; viewRoles(); }));
   }
@@ -360,6 +402,8 @@
       <div class="hero"><h2>${esc(d.role)}</h2>
         <div class="s">${co ? `<a href="#/company/${enc(r.slug)}">${esc(d.company)}</a>` : esc(d.company)} ${pill(r.status)}</div></div>
       ${d.needs_confirm ? `<div class="callout"><strong>To confirm:</strong> ${esc(d.needs_confirm)}</div>` : ""}
+      ${introsFor(r.slug).length ? `<div class="callout intros"><strong>Warm intros</strong><ul>${introsFor(r.slug).map((i) =>
+        `<li>${isHot(i) ? '<span class="pill hot">hot</span> ' : ""}<strong>${esc(i.via)}</strong> knows <strong>${esc(i.to)}</strong>${i.role ? `, ${esc(i.role)}` : ""}${isNew(i) ? ' <span class="pill new">new</span>' : ""}</li>`).join("")}</ul></div>` : ""}
       ${facts([["Applied", d.date_applied], ["Channel", d.channel], ["Contact", d.contact], ["Salary", d.salary],
         ["Location", d.location], ["Work mode", d.remote], ["Hours", d.hours], ["Level", d.level],
         ["Interview stage", d.interview_stage], ["Referred by", d.referred_by], ["Fit", d.fit_score], ["Interest", d.interest],

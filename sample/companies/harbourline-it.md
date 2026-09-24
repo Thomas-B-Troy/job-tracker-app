@@ -9,6 +9,17 @@ industry: "Managed service provider (fictional sample company)"
 size: "About 60 staff"
 hq: "Fortitude Valley, QLD"
 researched: "2026-09-16"
+intros:
+  - via: "Sam Cole"
+    to: "Priya Nair"
+    role: "Service Desk Team Lead (hiring manager)"
+    hot: true
+    added: "2026-09-14"
+  - via: "Alex Kim"
+    to: "Jordan Lee"
+    role: "Head of Service"
+    hot: false
+    added: "2026-09-16"
 ---
 
 ## Overview
