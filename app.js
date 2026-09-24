@@ -219,13 +219,53 @@
     : "";
   const fileName = (p) => String(p || "").split("/").pop();
 
+  // "- **Label:** value" lines inside a section, e.g. Role specifics.
+  function labelled(body, label) {
+    const m = new RegExp(`^-[ \\t]*\\*\\*${label}[^*\\n]*:\\*\\*[ \\t]*(\\S.*)$`, "im").exec(body || "");
+    return m ? m[1].trim() : "";
+  }
+
+  // First real line of a section, as plain text.
+  function firstLine(body, title) {
+    const s = sections(body || "").find((x) => x.title.toLowerCase() === title);
+    if (!s || isEmpty(s.text)) return "";
+    const line = s.text.split("\n").map((l) => l.trim())
+      .find((l) => l && !PLACEHOLDER.test(l) && l !== "---" && !l.startsWith("|") && !/^-\s*\*\*[^*]+:\*\*\s*$/.test(l));
+    return (line || "").replace(/^[-*]\s+/, "").replace(/\*\*|__|`/g, "").replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
+  }
+
+  function age(date) {
+    const t = Date.parse(date);
+    if (!t) return "";
+    const days = Math.max(0, Math.floor((Date.now() - t) / 86400000));
+    return days < 1 ? "today" : days < 7 ? `${days}d` : days < 60 ? `${Math.floor(days / 7)}w` : `${Math.floor(days / 30)}mo`;
+  }
+
+  const initials = (name) => String(name || "?").replace(/[^A-Za-z0-9 ]/g, " ").trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+  const hue = (name) => [...String(name || "")].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7) % 6;
+  const ICON_PIN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>';
+  const ICON_DOC = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h9l5 5v15H6zm8 1.5V8h4.5z"/></svg>';
+  const ICON_USER = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4 0-8 2-8 5v3h16v-3c0-3-4-5-8-5z"/></svg>';
+
   function roleCard(r) {
     const d = r.data;
-    return `<a class="card" href="#/role/${enc(r.path)}">
-      <div class="t">${esc(d.company)}</div>
-      <div class="s">${esc(d.role)}</div>
-      <div class="row">${pill(r.status)}${r.confirm ? '<span class="pill confirm">needs confirming</span>' : ""}
-        ${d.date_applied ? `<span class="muted small">applied ${esc(d.date_applied)}</span>` : ""}</div>
+    const co = state.companies[r.slug];
+    const about = co ? (firstLine(co.body, "overview") || co.data.industry || "") : "";
+    const summary = labelled(r.body, "Required skills") || firstLine(r.body, "posting");
+    const tags = [d.remote, d.hours, d.salary].map((x) => String(x || "").trim()).filter((x) => x && !/^not stated/i.test(x));
+    const people = [d.contact && `Contact: ${d.contact}`, d.referred_by && `Referred by ${d.referred_by}`].filter(Boolean).join(" · ");
+    const when = d.date_applied || d.date_found;
+    return `<a class="tile" href="#/role/${enc(r.path)}">
+      <div class="tile-head"><div class="tile-title">${esc(d.role)}</div>${when ? `<span class="age" title="${esc(when)}">${esc(age(when))}</span>` : ""}</div>
+      ${d.location ? `<div class="tile-loc">${ICON_PIN}<span>${esc(d.location)}</span></div>` : ""}
+      ${tags.length ? `<div class="tags">${tags.map((t) => `<span class="tag">${esc(t)}</span>`).join("")}</div>` : ""}
+      <div class="tile-co"><span class="avatar h${hue(d.company)}">${esc(initials(d.company))}</span>
+        <div class="clamp3"><strong>${esc(d.company)}</strong>${about ? `: ${esc(about)}` : ""}</div></div>
+      ${summary ? `<div class="tile-row">${ICON_DOC}<div class="clamp4">${esc(summary)}</div></div>` : ""}
+      ${people ? `<div class="tile-row">${ICON_USER}<div class="clamp2">${esc(people)}</div></div>` : ""}
+      ${d.next_action && !r.closed ? `<div class="tile-next"><strong>Next${d.next_action_date ? ` ${esc(d.next_action_date)}` : ""}:</strong> ${esc(d.next_action)}</div>` : ""}
+      <div class="tile-foot">${pill(r.status)}${r.confirm ? '<span class="pill confirm">needs confirming</span>' : ""}
+        <span class="muted small">${esc([d.date_applied && `Applied ${d.date_applied}`, d.channel].filter(Boolean).join(" · "))}</span></div>
     </a>`;
   }
 
@@ -276,6 +316,7 @@
     document.title = title === "Job Tracker" ? title : `${title} · Job Tracker`;
     $("#back").hidden = !back;
     document.querySelectorAll(".tabs a").forEach((a) => a.classList.toggle("on", a.dataset.tab === tab));
+    document.body.classList.toggle("wide", tab === "roles" && !back || tab === "");
   }
 
   // ---------- views
@@ -296,7 +337,7 @@
         `<button class="chip${k === roleFilter ? " on" : ""}" data-filter="${k}">${labels[k]} (${state.roles.filter(groups[k]).length})</button>`).join("")}</div>
       ${next.length && roleFilter === "open" ? `<div class="group-h">Next actions</div><div class="list">${next.map((r) =>
         `<a class="card" href="#/role/${enc(r.path)}"><div class="t">${esc(r.data.next_action_date)}: ${esc(r.data.next_action)}</div><div class="s">${esc(r.data.company)}, ${esc(r.data.role)}</div></a>`).join("")}</div><div class="group-h">Roles</div>` : ""}
-      <div class="list">${list.map(roleCard).join("") || '<p class="empty">No roles here.</p>'}</div>`;
+      <div class="tiles">${list.map(roleCard).join("") || '<p class="empty">No roles here.</p>'}</div>`;
     view.querySelectorAll("[data-filter]").forEach((b) => b.addEventListener("click", () => { roleFilter = b.dataset.filter; viewRoles(); }));
   }
 
@@ -375,7 +416,7 @@
         <div class="s">${esc(d.researched ? `Researched ${d.researched}` : "Not researched yet")}</div></div>
       ${facts([["Industry", d.industry], ["Size", d.size], ["Head office", d.hq]])}
       <div class="links">${links.map(([u, t]) => [safeUrl(u), t]).filter(([u]) => u).map(([u, t]) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(t)}</a>`).join("")}</div>
-      ${roles.length ? `<div class="group-h">Roles</div><div class="list">${roles.map(roleCard).join("")}</div>` : ""}
+      ${roles.length ? `<div class="group-h">Roles</div><div class="tiles">${roles.map(roleCard).join("")}</div>` : ""}
       ${people.length ? `<div class="group-h">Contacts on file</div><div class="list">${people.map(contactCard).join("")}</div>` : ""}
       <div class="group-h">Research</div>
       ${sectionBlocks(sections(c.body), ["overview", "people i know", "green flags", "red flags", "reviews"])}`;
@@ -454,7 +495,7 @@
     setChrome(`Search: ${q}`, "", false);
     view.innerHTML = `
       ${cos.length ? `<div class="group-h">Companies</div><div class="list">${cos.map(companyCard).join("")}</div>` : ""}
-      ${roles.length ? `<div class="group-h">Roles</div><div class="list">${roles.map(roleCard).join("")}</div>` : ""}
+      ${roles.length ? `<div class="group-h">Roles</div><div class="tiles">${roles.map(roleCard).join("")}</div>` : ""}
       ${people.length ? `<div class="group-h">People</div><div class="list">${people.map(contactCard).join("")}</div>` : ""}
       ${!roles.length && !cos.length && !people.length ? '<p class="empty">Nothing matches.</p>' : ""}`;
   }

@@ -1,6 +1,6 @@
 // Caches the app shell so it opens offline. Tracker data is never cached here:
 // GitHub API calls go straight to the network (the app keeps its own copy on device).
-const CACHE = "jt-shell-v1";
+const CACHE = "jt-shell-v2";
 const SHELL = ["./", "index.html", "styles.css", "app.js", "manifest.webmanifest", "icon.svg",
   "vendor/js-yaml.min.js", "vendor/marked.min.js", "vendor/purify.min.js"];
 
