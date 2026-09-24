@@ -1,0 +1,20 @@
+- name: Sam Cole
+  company: Harbourline IT
+  company_slug: harbourline-it
+  role: Project Coordinator
+  linkedin: ""
+  connection_type: LinkedIn 1st
+  initial_outreach: "2026-09-14"
+  follow_up: ""
+  status: active
+  next_step: Thank Sam after the panel interview
+  referral: Priya Nair
+  notes: Former colleague. Introduced me to the hiring manager.
+- name: Priya Nair
+  company: Harbourline IT
+  company_slug: harbourline-it
+  role: Service Desk Team Lead
+  connection_type: Hiring contact
+  status: active
+  next_step: Panel interview 26 Sep
+  notes: Hiring manager for the L1 role.

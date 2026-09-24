@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://api.github.com; img-src 'self' data:; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#1f3b57">
+  <title>Job Tracker</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="bar">
+      <button class="back" id="back" hidden aria-label="Back">&#8249;</button>
+      <h1 id="title">Job Tracker</h1>
+      <button class="icon-btn" id="refresh" aria-label="Refresh from GitHub" title="Refresh">&#8635;</button>
+    </div>
+    <input id="search" type="search" placeholder="Search companies, roles, people" autocomplete="off" aria-label="Search">
+  </header>
+
+  <main id="view" tabindex="-1"></main>
+
+  <nav class="tabs" aria-label="Sections">
+    <a href="#/roles" data-tab="roles">Roles</a>
+    <a href="#/companies" data-tab="companies">Companies</a>
+    <a href="#/contacts" data-tab="contacts">People</a>
+    <a href="#/week" data-tab="week">Week</a>
+    <a href="#/settings" data-tab="settings">Settings</a>
+  </nav>
+
+  <div id="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="vendor/js-yaml.min.js"></script>
+  <script src="vendor/marked.min.js"></script>
+  <script src="vendor/purify.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
