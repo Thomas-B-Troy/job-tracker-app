@@ -4,7 +4,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-09-24.7";
+  const APP_VERSION = "2026-10-01.1";
   const CONFIG_KEY = "jt.config";
   const CACHE_KEY = "jt.cache";
   const API = "https://api.github.com";
@@ -282,7 +282,10 @@
     const tags = [d.remote, d.hours, d.salary].map((x) => String(x || "").trim()).filter((x) => x && !/^not stated/i.test(x));
     const people = [d.contact && `Contact: ${d.contact}`, d.referred_by && `Referred by ${d.referred_by}`].filter(Boolean).join(" · ");
     const when = d.date_applied || d.date_found;
-    return `<a class="tile" href="#/role/${enc(r.path)}">
+    const iv = upcomingInterview(r);
+    const na = nextActionOf(r);
+    return `<a class="tile${iv ? " has-interview" : ""}${iv && iv.days === 0 ? " today" : ""}" href="#/role/${enc(r.path)}">
+      ${iv ? `<div class="tile-interview"><strong>Interview:</strong> ${esc(interviewLabel(iv))}</div>` : ""}
       <div class="tile-head"><div class="tile-title">${esc(d.role)}</div>${when ? `<span class="age" title="${esc(when)}">${esc(age(when))}</span>` : ""}</div>
       ${d.location ? `<div class="tile-loc">${ICON_PIN}<span>${esc(d.location)}</span></div>` : ""}
       ${tags.length ? `<div class="tags">${tags.map((t) => `<span class="tag">${esc(t)}</span>`).join("")}</div>` : ""}
@@ -291,7 +294,7 @@
       ${summary ? `<div class="tile-row">${ICON_DOC}<div class="clamp4">${esc(summary)}</div></div>` : ""}
       ${people ? `<div class="tile-row">${ICON_USER}<div class="clamp2">${esc(people)}</div></div>` : ""}
       ${introFlag(r)}
-      ${d.next_action && !r.closed ? `<div class="tile-next"><strong>Next${d.next_action_date ? ` ${esc(d.next_action_date)}` : ""}:</strong> ${esc(d.next_action)}</div>` : ""}
+      ${na ? `<div class="tile-next"><strong>Next${na.date ? ` ${esc(na.date)}` : ""}:</strong> ${esc(na.text)}${overduePill(na.late)}</div>` : ""}
       <div class="tile-foot">${pill(r.status)}${r.confirm ? '<span class="pill confirm">needs confirming</span>' : ""}
         <span class="muted small">${esc([d.date_applied && `Applied ${d.date_applied}`, d.channel].filter(Boolean).join(" · "))}</span></div>
     </a>`;
@@ -365,6 +368,57 @@
     try { if (navigator.setAppBadge) fresh ? navigator.setAppBadge(fresh) : navigator.clearAppBadge(); } catch { /* optional */ }
   }
 
+  // ---------- interviews
+  // interview_at is "YYYY-MM-DD HH:MM" in Brisbane time (no daylight saving), or just "YYYY-MM-DD".
+  function interviewOf(r) {
+    const m = /^(\d{4}-\d{2}-\d{2})(?:[ T](\d{1,2}):(\d{2}))?/.exec(String(r.data.interview_at || "").trim());
+    if (!m || r.closed) return null;
+    const time = m[2] ? `${m[2].padStart(2, "0")}:${m[3]}` : "";
+    const start = Date.parse(`${m[1]}T${time || "23:59"}:00+10:00`);
+    if (isNaN(start)) return null;
+    const days = Math.round((Date.parse(`${m[1]}T00:00:00Z`) - Date.parse(`${today()}T00:00:00Z`)) / 86400000);
+    const now = Date.now();
+    const over = now > start + (time ? 90 * 60000 : 0);
+    return { date: m[1], time, start, days, over, live: !over && !!time && now >= start };
+  }
+  const upcomingInterview = (r) => { const iv = interviewOf(r); return iv && !iv.over ? iv : null; };
+
+  const clock = (hhmm) => {
+    const [h, m] = hhmm.split(":").map(Number);
+    return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "am" : "pm"}`;
+  };
+  const inWords = (mins) => mins < 60 ? `${Math.max(1, Math.round(mins))} min` : mins < 180 ? `${Math.floor(mins / 60)}h ${Math.round(mins % 60)}m` : `${Math.round(mins / 60)}h`;
+
+  function interviewLabel(iv) {
+    if (iv.live) return `Happening now (${clock(iv.time)})`;
+    const t = iv.time ? clock(iv.time) : "";
+    if (iv.days === 0) return iv.time ? `Today ${t}, in ${inWords((iv.start - Date.now()) / 60000)}` : "Today";
+    if (iv.days === 1) return `Tomorrow${t ? " " + t : ""}`;
+    const d = new Date(`${iv.date}T00:00:00Z`).toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+    return `${d}${t ? ", " + t : ""} (in ${iv.days} days)`;
+  }
+
+  // Interview today/tomorrow first, then later interviews, then roles in interview stages, then offers.
+  function urgency(r) {
+    const iv = upcomingInterview(r);
+    if (iv) return iv.days <= 1 ? 0 : 1;
+    if (/^(interviewing|screening)/.test(r.status)) return 2;
+    if (r.status.startsWith("offer")) return 3;
+    return 4;
+  }
+  const byUrgency = (a, b) => urgency(a) - urgency(b) || (upcomingInterview(a)?.start || 0) - (upcomingInterview(b)?.start || 0);
+
+  // A next action is stale once its date has passed while an interview is still to come; the interview replaces it.
+  const nextActionOf = (r) => {
+    const d = r.data;
+    if (!d.next_action || r.closed) return null;
+    const date = String(d.next_action_date || "");
+    if (date && date < today() && upcomingInterview(r)) return null;
+    const late = date && date < today() ? Math.round((Date.parse(`${today()}T00:00:00Z`) - Date.parse(`${date}T00:00:00Z`)) / 86400000) : 0;
+    return { date, text: d.next_action, late };
+  };
+  const overduePill = (n) => n ? ` <span class="pill overdue">overdue ${n}d</span>` : "";
+
   // ---------- views
   function viewRoles() {
     setChrome("Job Tracker", "roles");
@@ -376,8 +430,9 @@
       all: () => true,
     };
     const labels = { open: "Open", intros: "Warm intros", confirm: "Needs confirming", closed: "Closed", all: "All" };
-    const list = state.roles.filter(groups[roleFilter] || groups.open);
-    const next = state.roles.filter((r) => !r.closed && r.data.next_action_date)
+    const list = state.roles.filter(groups[roleFilter] || groups.open).sort(byUrgency);
+    const interviews = state.roles.filter(upcomingInterview).sort(byUrgency);
+    const next = state.roles.filter((r) => r.data.next_action_date && nextActionOf(r))
       .sort((a, b) => String(a.data.next_action_date).localeCompare(String(b.data.next_action_date)));
     const hotLeads = state.roles.filter((r) => !r.closed)
       .flatMap((r) => introsFor(r.slug).filter(isHot).map((i) => ({ r, i })))
@@ -385,11 +440,15 @@
     view.innerHTML = `
       <div class="chips">${Object.keys(groups).map((k) =>
         `<button class="chip${k === roleFilter ? " on" : ""}" data-filter="${k}">${labels[k]} (${state.roles.filter(groups[k]).length})</button>`).join("")}</div>
+      ${interviews.length && roleFilter === "open" ? `<div class="group-h">Interviews</div><div class="list">${interviews.map((r) => {
+        const iv = upcomingInterview(r);
+        return `<a class="card interview${iv.days === 0 ? " today" : ""}" href="#/role/${enc(r.path)}"><div class="t">${esc(interviewLabel(iv))}</div><div class="s">${esc(r.data.company)}, ${esc(r.data.role)}</div>${r.data.interview_with || r.data.interview_format ? `<div class="s">${esc([r.data.interview_with, r.data.interview_format].filter(Boolean).join(" · "))}</div>` : ""}</a>`;
+      }).join("")}</div>` : ""}
       ${hotLeads.length && roleFilter === "open" ? `<div class="group-h">Hot leads</div><div class="list">${hotLeads.map(({ r, i }) =>
         `<a class="card lead" href="#/role/${enc(r.path)}"><div class="t">${esc(i.via)} knows ${esc(i.to)}${isNew(i) ? ' <span class="pill new">new</span>' : ""}</div><div class="s">${esc(i.role || "")}${i.role ? " · " : ""}${esc(r.data.company)}, ${esc(r.data.role)}</div></a>`).join("")}</div>` : ""}
       ${next.length && roleFilter === "open" ? `<div class="group-h">Next actions</div><div class="list">${next.map((r) =>
-        `<a class="card" href="#/role/${enc(r.path)}"><div class="t">${esc(r.data.next_action_date)}: ${esc(r.data.next_action)}</div><div class="s">${esc(r.data.company)}, ${esc(r.data.role)}</div></a>`).join("")}</div>` : ""}
-      ${(next.length || hotLeads.length) && roleFilter === "open" ? '<div class="group-h">Roles</div>' : ""}
+        `<a class="card" href="#/role/${enc(r.path)}"><div class="t">${esc(r.data.next_action_date)}: ${esc(r.data.next_action)}${overduePill(nextActionOf(r).late)}</div><div class="s">${esc(r.data.company)}, ${esc(r.data.role)}</div></a>`).join("")}</div>` : ""}
+      ${(next.length || hotLeads.length || interviews.length) && roleFilter === "open" ? '<div class="group-h">Roles</div>' : ""}
       <div class="tiles">${list.map(roleCard).join("") || '<p class="empty">No roles here.</p>'}</div>`;
     view.querySelectorAll("[data-filter]").forEach((b) => b.addEventListener("click", () => { roleFilter = b.dataset.filter; viewRoles(); }));
   }
@@ -417,7 +476,8 @@
         `<li>${isHot(i) ? '<span class="pill hot">hot</span> ' : ""}<strong>${esc(i.via)}</strong> knows <strong>${esc(i.to)}</strong>${i.role ? `, ${esc(i.role)}` : ""}${isNew(i) ? ' <span class="pill new">new</span>' : ""}</li>`).join("")}</ul></div>` : ""}
       ${facts([["Applied", d.date_applied], ["Channel", d.channel], ["Contact", d.contact], ["Salary", d.salary],
         ["Location", d.location], ["Work mode", d.remote], ["Hours", d.hours], ["Level", d.level],
-        ["Interview stage", d.interview_stage], ["Referred by", d.referred_by], ["Fit", d.fit_score], ["Interest", d.interest],
+        ["Interview", (() => { const iv = interviewOf(r); return iv ? (iv.over ? `Was ${iv.date}${iv.time ? " " + clock(iv.time) : ""}` : interviewLabel(iv)) : ""; })()],
+        ["Interview with", d.interview_with], ["Interview format", d.interview_format], ["Interview stage", d.interview_stage], ["Referred by", d.referred_by], ["Fit", d.fit_score], ["Interest", d.interest],
         ["Next action", [d.next_action_date, d.next_action].filter(Boolean).join(": ")]])}
       <div class="links">${links.filter(([u, t]) => u && t).map(([u, t]) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(t)}</a>`).join("")}
         ${!repoLink(d.resume_file) && d.resume_file ? `<span class="small muted">Resume: ${esc(fileName(d.resume_file))}</span>` : ""}
@@ -588,10 +648,10 @@
       <div class="stats">
         <div class="stat"><div class="n">${count(thisWeek, "applied")}</div><div class="k">Applications this week</div><div class="s">${trend("applied")}</div></div>
         <div class="stat"><div class="n">${count(thisWeek, "followups")}</div><div class="k">Follow-ups this week</div><div class="s">${trend("followups")}</div></div>
-        <div class="stat"><div class="n">${applied.length}</div><div class="k">Applications in total</div><div class="s">${total("researched")} companies researched</div></div>
+        <div class="stat"><div class="n">${applied.length}</div><div class="k">Applications in total</div><div class="s">${total("researched")} ${total("researched") === 1 ? "company" : "companies"} researched</div></div>
         <div class="stat"><div class="n">${applied.length ? Math.round((heard.length / applied.length) * 100) : 0}%</div><div class="k">Heard back</div><div class="s">${heard.length} of ${applied.length} applications</div></div>
         <div class="stat"><div class="n">${interviewing.length}</div><div class="k">In interview stages now</div><div class="s">${total("interviews")} calls or interviews logged</div></div>
-        <div class="stat"><div class="n">${total("intros")}</div><div class="k">Warm intros found</div><div class="s">across ${introCompanies} companies</div></div>
+        <div class="stat"><div class="n">${total("intros")}</div><div class="k">Warm intros found</div><div class="s">across ${introCompanies} ${introCompanies === 1 ? "company" : "companies"}</div></div>
       </div>
 
       <div class="group-h">Applications per week</div>

@@ -1,4 +1,6 @@
 :root {
+  --soon: #b4490f;
+  --soon-bg: #fde8d6;
   --bg: #f5f6f8;
   --surface: #ffffff;
   --text: #1b1f24;
@@ -293,3 +295,17 @@ tr.goal-row td { color: var(--muted); font-style: italic; }
 .tile .s { color: var(--muted); font-size: .9rem; }
 .tile .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: auto; }
 a.secondary.btn { display: inline-block; text-decoration: none; font: inherit; background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 10px 16px; }
+
+/* Interviews: pinned band, countdown banner on tiles, overdue marker */
+.card.interview { border-left: 4px solid var(--soon); }
+.card.interview.today { background: var(--soon-bg); border-color: var(--soon); }
+.card.interview.today .t { color: var(--soon); }
+.tile.has-interview { border-left: 4px solid var(--soon); }
+.tile-interview { font-size: .85rem; background: var(--soon-bg); color: var(--soon); border-radius: 8px; padding: 6px 8px; }
+.tile.today .tile-interview { background: var(--soon); color: #fff; }
+.pill.overdue { background: var(--bad); color: #fff; }
+@media (prefers-color-scheme: dark) {
+  :root { --soon: #f0a25c; --soon-bg: #3a2614; }
+  .tile.today .tile-interview { color: #1a1f25; }
+  .pill.overdue { color: #1a1f25; }
+}
