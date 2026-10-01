@@ -11,6 +11,9 @@ repo through the GitHub API with a token that stays on your device.
 Built by directing an AI coding assistant (Claude Code): I set the requirements, tested it
 and found the fixes; the AI wrote the code.
 
+**Live app:** [thomas-troy.com/job-tracker-app](https://thomas-troy.com/job-tracker-app/)
+(choose "Look around with sample data").
+
 ## What it tracks
 
 Based on a job search spreadsheet with three tabs:
@@ -29,8 +32,8 @@ activity log. Each change is saved as a commit to your repo.
 
 ## Try it
 
-Open the app, go to **Settings** and choose **Try it with sample data**. The sample
-companies and people are made up.
+Open the app and choose **Look around with sample data**. The sample companies and people
+are made up.
 
 ## Use it with your own data
 
@@ -64,6 +67,9 @@ contact: "Priya Nair (Team Lead)"
 resume_file: "applications/Resume - Service Desk Analyst.docx"
 next_action: "Follow up"
 next_action_date: "2026-09-26"
+interview_at: "2026-10-01 15:30"   # optional: Brisbane time, "YYYY-MM-DD HH:MM" or just "YYYY-MM-DD"
+interview_with: "Head of IT"       # optional
+interview_format: "1 hour"         # optional, e.g. "video call" or "on site"
 ---
 
 ## Alignment
@@ -76,7 +82,7 @@ next_action_date: "2026-09-26"
 ```
 
 Company files can list warm introduction paths in their header. The app flags them on each
-role tile, lists hot leads at the top of the Roles tab, and marks any added since your last visit
+role tile, lists hot leads near the top of the Roles tab (below interviews), and marks any added since your last visit
 as new (with a badge on the home-screen icon where the phone supports it):
 
 ```yaml
@@ -87,6 +93,27 @@ intros:
     hot: true                # a direct line to the hiring side
     added: "2026-09-14"
 ```
+
+### Interviews
+
+Add `interview_at` to a role when an interview is booked. The time is read as Brisbane time
+(no daylight saving), and the time part can be left off. `interview_with` and
+`interview_format` are optional and shown on the card. The free-text `interview_stage` field
+still works for notes, but only `interview_at` drives the behaviour below.
+
+- **Upcoming:** an **Interviews** band sits at the very top of the Roles tab, above hot
+  leads, with a countdown ("Today 3:30 pm, in 4h", "Tomorrow", "Sat 3 Oct, 10:00 am (in 3
+  days)"). Today's interview is highlighted, and the role's tile carries the same banner.
+- **Ranking:** role tiles are ordered by urgency: interview today or tomorrow, later
+  interviews, roles in `interviewing` or `screening`, offers, then everything else.
+- **Awaiting outcome:** 90 minutes after the start time, the role moves to an **Awaiting
+  outcome** band. It shows when you interviewed and what to do next: "Send a thank-you note"
+  for the first two days (cleared by an activity log line since the interview that mentions
+  "thank"), "Waiting to hear back", then an amber "time to chase" after 7 days. It stays
+  there until you change the status (offer, rejected, no-response and so on).
+- **Overdue actions:** a `next_action_date` in the past shows an "overdue" marker. A next
+  action is hidden when an interview is still to come and its date has passed, or when it is
+  dated on or before an interview that has now happened, because the interview replaces it.
 
 See `sample/` for complete examples of every file type.
 
@@ -112,6 +139,34 @@ The format is meant to be written by an AI assistant as well as by you. A typica
   `api.github.com`. All libraries are vendored and pinned (no third-party CDN at runtime).
 - Everything rendered from Markdown goes through DOMPurify, so research pasted from web
   pages can't run scripts in the app.
+
+## How I built it
+
+**The problem.** I'm moving into IT after 20 years in sales, account management and
+training, and applying for a lot of roles. My career advisor gave me a spreadsheet for
+tracking applications, networking and weekly progress. It worked at a desk, but when an
+employer rang I needed the role, the company and the people involved on my phone in
+seconds.
+
+**What I decided.**
+- No server and no database to look after. My data stays in a private GitHub repo I already
+  had; the app is a static page that reads it.
+- Plain text files (Markdown and YAML), so I can read and edit them myself and an AI
+  assistant can do the research and write it straight into the right place.
+- Security first, because the repo holds my resumes and contacts: a fine-grained token
+  limited to one repo, a strict Content Security Policy, and sanitised rendering.
+- Kept the spreadsheet's structure (roles, networking, weekly tracker), then added what I
+  found I needed: warm intro flags, a hot leads list, and progress worked out from the
+  activity I already log.
+
+**How the work split.** I wrote the requirements, reviewed every change, tested it on my
+iPhone and PC, and found the bugs (for example, the installed iPhone app not picking up new
+versions, which led to the update check on reopen). Claude Code wrote the code and did the
+company research I asked for, which I checked before it went into my tracker.
+
+**What I learned.** How GitHub Pages, fine-grained tokens and the GitHub API fit together,
+how a service worker caches an app for offline use, and why that cache needs a way to let
+updates through.
 
 ## Libraries
 
