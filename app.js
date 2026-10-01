@@ -4,7 +4,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2026-10-01.1";
+  const APP_VERSION = "2026-10-01.2";
   const CONFIG_KEY = "jt.config";
   const CACHE_KEY = "jt.cache";
   const API = "https://api.github.com";
@@ -284,8 +284,11 @@
     const when = d.date_applied || d.date_found;
     const iv = upcomingInterview(r);
     const na = nextActionOf(r);
+    const aw = awaitingOutcome(r);
+    const nudge = aw && outcomeNudge(r, aw);
     return `<a class="tile${iv ? " has-interview" : ""}${iv && iv.days === 0 ? " today" : ""}" href="#/role/${enc(r.path)}">
       ${iv ? `<div class="tile-interview"><strong>Interview:</strong> ${esc(interviewLabel(iv))}</div>` : ""}
+      ${aw ? `<div class="tile-awaiting${nudge.chase ? " chase" : ""}"><strong>${esc(outcomeLabel(aw))}</strong><br>${esc(nudge.text)}</div>` : ""}
       <div class="tile-head"><div class="tile-title">${esc(d.role)}</div>${when ? `<span class="age" title="${esc(when)}">${esc(age(when))}</span>` : ""}</div>
       ${d.location ? `<div class="tile-loc">${ICON_PIN}<span>${esc(d.location)}</span></div>` : ""}
       ${tags.length ? `<div class="tags">${tags.map((t) => `<span class="tag">${esc(t)}</span>`).join("")}</div>` : ""}
@@ -402,18 +405,43 @@
   function urgency(r) {
     const iv = upcomingInterview(r);
     if (iv) return iv.days <= 1 ? 0 : 1;
-    if (/^(interviewing|screening)/.test(r.status)) return 2;
+    if (awaitingOutcome(r) || /^(interviewing|screening)/.test(r.status)) return 2;
     if (r.status.startsWith("offer")) return 3;
     return 4;
   }
   const byUrgency = (a, b) => urgency(a) - urgency(b) || (upcomingInterview(a)?.start || 0) - (upcomingInterview(b)?.start || 0);
 
-  // A next action is stale once its date has passed while an interview is still to come; the interview replaces it.
+  // Interviewed and still open (not an offer yet): waiting to hear back.
+  const awaitingOutcome = (r) => { const iv = interviewOf(r); return iv && iv.over && !r.status.startsWith("offer") ? iv : null; };
+
+  const shortDate = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+
+  function outcomeLabel(iv) {
+    const ago = Math.max(0, -iv.days);
+    return `Interviewed ${shortDate(iv.date)}${ago === 0 ? " (today)" : ` (${ago} day${ago === 1 ? "" : "s"} ago)`}`;
+  }
+
+  // What to do next while waiting: thank-you note first, then a chaser once a week has passed.
+  function outcomeNudge(r, iv) {
+    const ago = Math.max(0, -iv.days);
+    const thanked = String(r.body || "").split("\n").some((line) => {
+      const m = /^-\s*(\d{4}-\d{2}-\d{2}):(.*)$/.exec(line.trim());
+      return m && m[1] >= iv.date && /thank/i.test(m[2]);
+    });
+    if (ago >= 7) return { text: `No word in ${ago} days, time to chase`, chase: true };
+    if (!thanked && ago <= 2) return { text: "Send a thank-you note", chase: false };
+    return { text: "Waiting to hear back", chase: false };
+  }
+
+  // A next action is stale once its date has passed while an interview is still to come, or if it was set
+  // before an interview that has now happened; the interview (or the awaiting-outcome prompt) replaces it.
   const nextActionOf = (r) => {
     const d = r.data;
     if (!d.next_action || r.closed) return null;
     const date = String(d.next_action_date || "");
     if (date && date < today() && upcomingInterview(r)) return null;
+    const done = awaitingOutcome(r);
+    if (date && done && date <= done.date) return null;
     const late = date && date < today() ? Math.round((Date.parse(`${today()}T00:00:00Z`) - Date.parse(`${date}T00:00:00Z`)) / 86400000) : 0;
     return { date, text: d.next_action, late };
   };
@@ -432,6 +460,7 @@
     const labels = { open: "Open", intros: "Warm intros", confirm: "Needs confirming", closed: "Closed", all: "All" };
     const list = state.roles.filter(groups[roleFilter] || groups.open).sort(byUrgency);
     const interviews = state.roles.filter(upcomingInterview).sort(byUrgency);
+    const awaiting = state.roles.filter((r) => !r.closed && awaitingOutcome(r)).sort((a, b) => interviewOf(b).start - interviewOf(a).start);
     const next = state.roles.filter((r) => r.data.next_action_date && nextActionOf(r))
       .sort((a, b) => String(a.data.next_action_date).localeCompare(String(b.data.next_action_date)));
     const hotLeads = state.roles.filter((r) => !r.closed)
@@ -444,11 +473,15 @@
         const iv = upcomingInterview(r);
         return `<a class="card interview${iv.days === 0 ? " today" : ""}" href="#/role/${enc(r.path)}"><div class="t">${esc(interviewLabel(iv))}</div><div class="s">${esc(r.data.company)}, ${esc(r.data.role)}</div>${r.data.interview_with || r.data.interview_format ? `<div class="s">${esc([r.data.interview_with, r.data.interview_format].filter(Boolean).join(" · "))}</div>` : ""}</a>`;
       }).join("")}</div>` : ""}
+      ${awaiting.length && roleFilter === "open" ? `<div class="group-h">Awaiting outcome</div><div class="list">${awaiting.map((r) => {
+        const iv = awaitingOutcome(r), nudge = outcomeNudge(r, iv);
+        return `<a class="card awaiting${nudge.chase ? " chase" : ""}" href="#/role/${enc(r.path)}"><div class="t">${esc(outcomeLabel(iv))}</div><div class="s">${esc(r.data.company)}, ${esc(r.data.role)}</div><div class="s nudge">${esc(nudge.text)}</div></a>`;
+      }).join("")}</div>` : ""}
       ${hotLeads.length && roleFilter === "open" ? `<div class="group-h">Hot leads</div><div class="list">${hotLeads.map(({ r, i }) =>
         `<a class="card lead" href="#/role/${enc(r.path)}"><div class="t">${esc(i.via)} knows ${esc(i.to)}${isNew(i) ? ' <span class="pill new">new</span>' : ""}</div><div class="s">${esc(i.role || "")}${i.role ? " · " : ""}${esc(r.data.company)}, ${esc(r.data.role)}</div></a>`).join("")}</div>` : ""}
       ${next.length && roleFilter === "open" ? `<div class="group-h">Next actions</div><div class="list">${next.map((r) =>
         `<a class="card" href="#/role/${enc(r.path)}"><div class="t">${esc(r.data.next_action_date)}: ${esc(r.data.next_action)}${overduePill(nextActionOf(r).late)}</div><div class="s">${esc(r.data.company)}, ${esc(r.data.role)}</div></a>`).join("")}</div>` : ""}
-      ${(next.length || hotLeads.length || interviews.length) && roleFilter === "open" ? '<div class="group-h">Roles</div>' : ""}
+      ${(next.length || hotLeads.length || interviews.length || awaiting.length) && roleFilter === "open" ? '<div class="group-h">Roles</div>' : ""}
       <div class="tiles">${list.map(roleCard).join("") || '<p class="empty">No roles here.</p>'}</div>`;
     view.querySelectorAll("[data-filter]").forEach((b) => b.addEventListener("click", () => { roleFilter = b.dataset.filter; viewRoles(); }));
   }
@@ -476,7 +509,7 @@
         `<li>${isHot(i) ? '<span class="pill hot">hot</span> ' : ""}<strong>${esc(i.via)}</strong> knows <strong>${esc(i.to)}</strong>${i.role ? `, ${esc(i.role)}` : ""}${isNew(i) ? ' <span class="pill new">new</span>' : ""}</li>`).join("")}</ul></div>` : ""}
       ${facts([["Applied", d.date_applied], ["Channel", d.channel], ["Contact", d.contact], ["Salary", d.salary],
         ["Location", d.location], ["Work mode", d.remote], ["Hours", d.hours], ["Level", d.level],
-        ["Interview", (() => { const iv = interviewOf(r); return iv ? (iv.over ? `Was ${iv.date}${iv.time ? " " + clock(iv.time) : ""}` : interviewLabel(iv)) : ""; })()],
+        ["Interview", (() => { const iv = interviewOf(r); return iv ? (iv.over ? `${outcomeLabel(iv)}${iv.time ? ", " + clock(iv.time) : ""}. ${outcomeNudge(r, iv).text}` : interviewLabel(iv)) : ""; })()],
         ["Interview with", d.interview_with], ["Interview format", d.interview_format], ["Interview stage", d.interview_stage], ["Referred by", d.referred_by], ["Fit", d.fit_score], ["Interest", d.interest],
         ["Next action", [d.next_action_date, d.next_action].filter(Boolean).join(": ")]])}
       <div class="links">${links.filter(([u, t]) => u && t).map(([u, t]) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(t)}</a>`).join("")}

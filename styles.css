@@ -304,6 +304,12 @@ a.secondary.btn { display: inline-block; text-decoration: none; font: inherit; b
 .tile-interview { font-size: .85rem; background: var(--soon-bg); color: var(--soon); border-radius: 8px; padding: 6px 8px; }
 .tile.today .tile-interview { background: var(--soon); color: #fff; }
 .pill.overdue { background: var(--bad); color: #fff; }
+/* Awaiting outcome: interview done, waiting to hear back */
+.card.awaiting { border-left: 4px solid var(--muted); }
+.card.awaiting.chase { border-left-color: var(--warn-text); background: var(--warn-bg); }
+.card.awaiting .nudge { color: var(--text); font-weight: 600; }
+.tile-awaiting { font-size: .85rem; background: var(--pill); border-radius: 8px; padding: 6px 8px; }
+.tile-awaiting.chase { background: var(--warn-bg); color: var(--warn-text); }
 @media (prefers-color-scheme: dark) {
   :root { --soon: #f0a25c; --soon-bg: #3a2614; }
   .tile.today .tile-interview { color: #1a1f25; }
